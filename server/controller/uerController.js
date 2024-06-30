@@ -3,25 +3,17 @@ const fs = require("fs");
 const xml2js = require("xml2js");
 const path = require("path");
 const { dd } = require("../dump-die/dd.js");
+const Joi = require("joi");
 
-const xmlDir = "xml\\users";
+const parser = new xml2js.Parser();
+const builder = new xml2js.Builder();
+
+const setup = require("../xml/database.js");
+
+setup.setupUser();
+
+const xmlDir = setup.xmlDirUser;
 const xmlFilePath = path.join(xmlDir, "user.xml");
-
-if (!fs.existsSync(xmlDir)) {
-  fs.mkdirSync(xmlDir, { recursive: true });
-
-  const initialContent =
-    '<?xml version="1.0" encoding="UTF-8"?><users><user><name/><age/></user></users>';
-  fs.writeFile(xmlFilePath, initialContent, (err) => {
-    if (err) {
-      console.error("Error creating file:", err);
-      res.status(500).send("Error creating file");
-      return;
-    }
-
-    console.log("File created successfully");
-  });
-}
 
 function getUsers(req, res, next) {
   const xml = fs.readFileSync(xmlFilePath, "utf-8");
@@ -38,10 +30,21 @@ function getUsers(req, res, next) {
 }
 
 function insertUser(req, res, next) {
+  const valid = Joi.object({
+    name: Joi.string().required(),
+    age: Joi.number().required(),
+  });
+
+  const { err, value } = valid.validate(req.body);
+
+  if (err) {
+    return res.status(400).json({ error: err.details.map((d) => d.message) });
+  }
+
   const newUser = {
     user: {
-      name: "Rattana",
-      age: 30,
+      name: value.name,
+      age: value.age,
     },
   };
 
@@ -52,8 +55,6 @@ function insertUser(req, res, next) {
       return;
     }
 
-    // แปลง XML เป็น JSON
-    const parser = new xml2js.Parser();
     parser.parseString(data, (err, result) => {
       if (err) {
         console.error("Error parsing XML:", err);
@@ -61,15 +62,11 @@ function insertUser(req, res, next) {
         return;
       }
 
-      // เพิ่มข้อมูลใหม่ลงใน JSON
-      result.users.user = result.users.user || [];
-      result.users.user.push(newUser.user);
+      if (typeof result.users === "string") result.users = newUser;
+      else result.users.user.push(newUser.user);
 
-      // แปลง JSON กลับเป็น XML
-      const builder = new xml2js.Builder();
       const updatedXML = builder.buildObject(result);
 
-      // เขียน XML กลับไปยังไฟล์
       fs.writeFile(xmlFilePath, updatedXML, (err) => {
         if (err) {
           console.error("Error writing file:", err);
@@ -77,8 +74,8 @@ function insertUser(req, res, next) {
           return;
         }
 
-        console.log("File updated successfully");
-        res.status(200).send("File updated successfully");
+        console.log("Insert User is success!");
+        res.status(200).send("Insert User is success!");
       });
     });
   });
