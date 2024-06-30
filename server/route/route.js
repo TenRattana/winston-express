@@ -1,7 +1,8 @@
 const express = require("express");
-const reject = require('../controller/reject');
+const userController = require('../controller/uerController');
 const router = express.Router();
 
-router.get("/reject", reject.reject);
+router.get("/getListUers", userController.getUsers);
+router.get("/insertUser", userController.insertUser);
 
 module.exports = router ;
